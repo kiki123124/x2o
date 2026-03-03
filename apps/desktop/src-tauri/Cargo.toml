@@ -1,10 +1,10 @@
 [package]
-name = "tweetvault-desktop"
+name = "x2o-desktop"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "tweetvault_desktop_lib"
+name = "x2o_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
