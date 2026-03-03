@@ -1,7 +1,7 @@
 #!/usr/bin/env npx tsx
 /**
- * TweetVault CLI — Export X bookmarks + AI classify + Obsidian vault
- * Usage: npx tsx tweetvault.ts --cookie "..." --provider deepseek --api-key "sk-..." --output ~/vault
+ * x2o CLI — Export X bookmarks + AI classify + Obsidian vault
+ * Usage: npx tsx x2o.ts --cookie "..." --provider deepseek --api-key "sk-..." --output ~/vault
  */
 
 import * as fs from "fs";
@@ -29,7 +29,7 @@ const PROVIDER = args["provider"] || "openai";
 const API_KEY = args["api-key"] || "";
 const MODEL = args["model"] || "";
 const BASE_URL = args["base-url"] || "";
-const OUTPUT_DIR = (args["output"] || "~/tweetvault-output").replace(/^~/, os.homedir());
+const OUTPUT_DIR = (args["output"] || "~/x2o-output").replace(/^~/, os.homedir());
 const LIMIT = parseInt(args["limit"] || "800", 10);
 const FETCH_ONLY = args["fetch-only"] === "true";
 
@@ -378,8 +378,8 @@ function generateVault(items: ClassifiedBookmark[], outputDir: string): number {
 
   // Root index
   const rootLines = [
-    "---", `title: "TweetVault"`, `type: vault-index`, "---", "",
-    "# TweetVault", "",
+    "---", `title: "x2o"`, `type: vault-index`, "---", "",
+    "# x2o", "",
     `${items.length} bookmarks across ${byCategory.size} categories.`, "",
     ...[...byCategory].map(([cat, items]) => `- **[[${sanitizePath(cat)}/_index|${cat}]]** (${items.length})`),
   ];
@@ -392,7 +392,7 @@ function generateVault(items: ClassifiedBookmark[], outputDir: string): number {
 // ─── Main ───────────────────────────────────────────────────────
 
 async function main() {
-  console.log("🏛️  TweetVault CLI\n");
+  console.log("🏛️  x2o CLI\n");
 
   // Step 1: Get bookmarks
   let bookmarks: Bookmark[];

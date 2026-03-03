@@ -35,7 +35,7 @@ export default function App() {
   const [inputPath, setInputPath] = createSignal("");
   const [cookie, setCookie] = createSignal("");
   const [limitInput, setLimitInput] = createSignal("800");
-  const [outputDir, setOutputDir] = createSignal("~/tweetvault-output");
+  const [outputDir, setOutputDir] = createSignal("~/x2o-output");
   const [error, setError] = createSignal("");
   const [fetchedBookmarks, setFetchedBookmarks] = createSignal<Bookmark[]>([]);
   const [result, setResult] = createSignal<SyncResult | null>(null);

@@ -46,7 +46,7 @@ async fn read_text_file_rust(path: String) -> Result<String, String> {
 
 #[command]
 async fn append_debug_log(line: String) -> Result<(), String> {
-    let path = "/tmp/tweetvault-debug.log";
+    let path = "/tmp/x2o-debug.log";
     let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string();
     let full = format!("[{}] {}\n", now, line);
     use tokio::io::AsyncWriteExt;

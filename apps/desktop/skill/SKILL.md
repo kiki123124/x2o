@@ -1,5 +1,5 @@
 ---
-name: tweetvault
+name: x2o
 description: |
   Export X (Twitter) bookmarks, classify them with AI, and generate an Obsidian knowledge vault.
 
@@ -10,13 +10,13 @@ description: |
   - Batch processing bookmarks from JSON exports
 
   TRIGGERS:
-  - "导出书签", "export bookmarks", "X 书签", "tweet vault", "书签分类"
+  - "导出书签", "export bookmarks", "X 书签", "x2o", "书签分类"
   - "twitter bookmarks", "obsidian vault from bookmarks"
   - "classify my bookmarks", "organize bookmarks"
-version: 0.1.0
+version: 0.2.0
 ---
 
-# TweetVault — X Bookmark Export + AI Classification
+# x2o — X Bookmark Export + AI Classification
 
 Export X (Twitter) bookmarks → AI classify → Obsidian knowledge vault. All local, no third-party servers.
 
@@ -25,22 +25,22 @@ Export X (Twitter) bookmarks → AI classify → Obsidian knowledge vault. All l
 Run the CLI script via `npx tsx`:
 
 ```bash
-npx tsx ~/.claude/skills/tweetvault/scripts/tweetvault.ts \
+npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
   --cookie "<X cookie string>" \
   --provider deepseek \
   --api-key "sk-..." \
-  --output ~/tweetvault-output \
+  --output ~/x2o-output \
   --limit 100
 ```
 
 ### From existing JSON file (skip fetching):
 
 ```bash
-npx tsx ~/.claude/skills/tweetvault/scripts/tweetvault.ts \
+npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
   --input bookmarks.json \
   --provider openai \
   --api-key "sk-..." \
-  --output ~/tweetvault-output
+  --output ~/x2o-output
 ```
 
 ## Parameters
@@ -51,7 +51,7 @@ npx tsx ~/.claude/skills/tweetvault/scripts/tweetvault.ts \
 | `--input` | Yes* | Path to existing bookmarks JSON (alternative to cookie) |
 | `--provider` | Yes | AI provider: `openai`, `claude`, `deepseek`, `gemini`, `ollama`, `groq`, `moonshot`, `qwen`, `zhipu`, `siliconflow`, `mistral`, `together`, `fireworks`, `xai`, `openrouter`, `cohere`, `deepinfra`, `perplexity` |
 | `--api-key` | Yes** | API key for the chosen provider |
-| `--output` | No | Output directory (default: `~/tweetvault-output`) |
+| `--output` | No | Output directory (default: `~/x2o-output`) |
 | `--limit` | No | Max bookmarks to fetch (default: 800) |
 | `--model` | No | Override default model for the provider |
 | `--base-url` | No | Override API base URL |
@@ -76,4 +76,4 @@ OpenAI, Claude, DeepSeek, Gemini, Ollama, OpenRouter, Moonshot, Qwen, Zhipu GLM,
 
 ## Source
 
-GitHub: https://github.com/kiki123124/tweetvault
+GitHub: https://github.com/kiki123124/x2o

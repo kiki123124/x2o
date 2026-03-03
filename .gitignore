@@ -10,3 +10,4 @@ target/
 apps/desktop/src-tauri/target/
 apps/desktop/dist/
 apps/desktop/node_modules/
+tweetvault-classified.json

@@ -27,22 +27,33 @@
 
 > ⚠️ 首次打开可能提示"无法验证开发者"，前往 **系统设置 → 隐私与安全性 → 仍要打开**
 
-### CLI Skill（Claude Code 用户）
+### CLI Skill（Claude Code / OpenClaw 用户）
 
-**安装：**
+**一键安装：**
 
 ```bash
-# 复制 skill 到 Claude Code skills 目录
+# 克隆仓库并复制 skill
+git clone https://github.com/kiki123124/x2o.git /tmp/x2o
 mkdir -p ~/.claude/skills/x2o
-cp -r apps/desktop/skill/* ~/.claude/skills/x2o/
+cp -r /tmp/x2o/apps/desktop/skill/* ~/.claude/skills/x2o/
+rm -rf /tmp/x2o
 ```
 
-安装后在 Claude Code 里说"帮我导出 X 书签"即可触发。
-
-**手动运行：**
+**或手动安装：**
 
 ```bash
-npx tsx ~/.claude/skills/x2o/scripts/tweetvault.ts \
+# 1. 下载 skill 文件
+mkdir -p ~/.claude/skills/x2o/scripts
+curl -sL https://raw.githubusercontent.com/kiki123124/x2o/main/apps/desktop/skill/SKILL.md -o ~/.claude/skills/x2o/SKILL.md
+curl -sL https://raw.githubusercontent.com/kiki123124/x2o/main/apps/desktop/skill/scripts/x2o.ts -o ~/.claude/skills/x2o/scripts/x2o.ts
+```
+
+安装后重启 Claude Code，说"帮我导出 X 书签"即可触发。
+
+**直接运行（不安装 skill）：**
+
+```bash
+npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
   --cookie "<你的 X Cookie>" \
   --provider deepseek \
   --api-key "sk-..." \
@@ -89,7 +100,7 @@ pnpm tauri build
 
 **CLI：**
 ```bash
-npx tsx tweetvault.ts --cookie "..." --provider deepseek --api-key "sk-..." --output ~/vault
+npx tsx x2o.ts --cookie "..." --provider deepseek --api-key "sk-..." --output ~/vault
 ```
 
 ---
@@ -123,7 +134,7 @@ apps/desktop/
 ├── public/               # 静态资源（logo + AI 服务商图标）
 └── skill/                # Claude Code Skill
     ├── SKILL.md
-    └── scripts/tweetvault.ts
+    └── scripts/x2o.ts
 ```
 
 ---
