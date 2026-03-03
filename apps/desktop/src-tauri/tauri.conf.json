@@ -10,19 +10,19 @@
     "beforeBuildCommand": "pnpm build"
   },
   "app": {
-    "withGlobalTauri": false,
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "TweetVault",
-        "width": 480,
-        "height": 720,
+        "width": 920,
+        "height": 540,
         "resizable": true,
         "decorations": true,
         "center": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "minWidth": 400,
-        "minHeight": 600
+        "minWidth": 760,
+        "minHeight": 440
       }
     ],
     "security": {

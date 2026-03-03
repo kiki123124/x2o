@@ -11,19 +11,20 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@lobehub/icons-static-svg": "^1.82.0",
     "@tauri-apps/api": "^2.0.0",
-    "@tauri-apps/plugin-shell": "^2.0.0",
-    "@tauri-apps/plugin-fs": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
+    "@tauri-apps/plugin-fs": "^2.0.0",
     "@tauri-apps/plugin-http": "^2.0.0",
+    "@tauri-apps/plugin-shell": "^2.0.0",
     "@tombcato/ai-selector-core": "^0.1.11"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "solid-js": "^1.9.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.4.0",
     "vite": "^6.0.0",
-    "vite-plugin-solid": "^2.10.0",
-    "solid-js": "^1.9.0"
+    "vite-plugin-solid": "^2.10.0"
   }
 }

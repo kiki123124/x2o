@@ -3,10 +3,75 @@
  * No Node.js dependency. Uses Tauri plugins for file I/O and CORS-free HTTP.
  */
 
-import { mkdir, writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
-import { join, homeDir } from "@tauri-apps/api/path";
-import { sendDirectChat } from "@tombcato/ai-selector-core";
 import { resolveBookmarkQueryId } from "./query-id-resolver";
+
+// Tauri plugins are imported dynamically to avoid blocking initial render
+async function getTauriFs() {
+  return import("@tauri-apps/plugin-fs");
+}
+async function getTauriPath() {
+  return import("@tauri-apps/api/path");
+}
+async function getTauriInvoke() {
+  return import("@tauri-apps/api/core");
+}
+
+async function debugLog(line: string): Promise<void> {
+  try {
+    const { invoke } = await getTauriInvoke();
+    await invoke("append_debug_log", { line });
+  } catch {
+    // Ignore logging failures
+  }
+}
+
+async function resolveOutputDirPath(outputDir: string): Promise<string> {
+  const raw = (outputDir || "").trim();
+  if (!raw) return raw;
+
+  // Tauri fs does not expand "~", normalize it to an absolute home path.
+  if (raw === "~" || raw.startsWith("~/") || raw.startsWith("~\\")) {
+    const { homeDir, join } = await getTauriPath();
+    const home = await homeDir();
+    if (raw === "~") return home;
+    const remainder = raw
+      .slice(2)
+      .replace(/^[/\\]+/, "")
+      .replace(/\\/g, "/");
+    return join(home, remainder);
+  }
+
+  return raw;
+}
+
+/** Use Rust-side HTTP to avoid IPC memory explosion from tauriFetch plugin */
+async function rustGet(url: string, headers: Record<string, string>): Promise<string> {
+  const { invoke } = await getTauriInvoke();
+  const [status, body] = await invoke<[number, string]>("http_request", {
+    method: "GET",
+    url,
+    headers,
+    body: null,
+  });
+  if (status >= 400) {
+    throw new Error(`HTTP ${status}: ${body.slice(0, 240)}`);
+  }
+  return body;
+}
+
+async function rustPost(url: string, headers: Record<string, string>, body: string): Promise<string> {
+  const { invoke } = await getTauriInvoke();
+  const [status, text] = await invoke<[number, string]>("http_request", {
+    method: "POST",
+    url,
+    headers,
+    body,
+  });
+  if (status >= 400) {
+    throw new Error(`HTTP ${status}: ${text.slice(0, 240)}`);
+  }
+  return text;
+}
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -43,6 +108,9 @@ export interface SyncConfig {
 export interface SyncProgress {
   step: number;
   detail: string;
+  percent?: number;
+  current?: number;
+  total?: number;
 }
 
 export interface SyncResult {
@@ -50,48 +118,147 @@ export interface SyncResult {
   categories: string[];
   outputDir: string;
   bookmarkCount: number;
+  previewItems: ClassifiedBookmark[];
 }
 
-// ─── Main Pipeline ───────────────────────────────────────────────
+// ─── Phase 1: Fetch Only ────────────────────────────────────────
 
-export async function syncBookmarks(
+export async function fetchOnly(
   config: SyncConfig,
   onProgress?: (p: SyncProgress) => void,
-): Promise<SyncResult> {
-  // Step 1: Fetch bookmarks
-  onProgress?.({ step: 1, detail: "正在获取书签..." });
+): Promise<Bookmark[]> {
+  const limit = config.limit ?? 800;
+  await debugLog(`fetchOnly:start limit=${limit} inputPath=${!!config.inputPath} cookie=${!!config.cookie}`);
+  onProgress?.({ step: 1, detail: "正在获取书签...", percent: 0 });
   let bookmarks: Bookmark[];
 
   if (config.inputPath) {
-    const raw = await readTextFile(config.inputPath);
-    const data = JSON.parse(raw);
-    bookmarks = Array.isArray(data) ? data : data.bookmarks ?? [];
-    onProgress?.({ step: 1, detail: `读取到 ${bookmarks.length} 条书签` });
+    const loaded = await readBookmarksFromJsonViaRust(config.inputPath, limit, onProgress);
+    bookmarks = loaded.bookmarks;
+    if (loaded.truncated) {
+      onProgress?.({
+        step: 1,
+        detail: `读取到 ${loaded.returned} 条（原始 ${loaded.total} 条，已按上限截断）`,
+        percent: 100,
+        current: loaded.returned,
+        total: loaded.total,
+      });
+    } else {
+      onProgress?.({
+        step: 1,
+        detail: `读取到 ${bookmarks.length} 条书签`,
+        percent: 100,
+        current: bookmarks.length,
+        total: bookmarks.length,
+      });
+    }
   } else if (config.cookie) {
-    bookmarks = await fetchBookmarks(config.cookie, config.limit ?? 100, onProgress);
+    onProgress?.({ step: 1, detail: "正在从 X 拉取书签（Rust 模式）...", percent: 10 });
+    const { invoke } = await getTauriInvoke();
+    bookmarks = await invoke<Bookmark[]>("fetch_bookmarks_rust", {
+      cookie: config.cookie,
+      limit,
+    });
+    await debugLog(`fetchOnly:rust_fetch_done count=${bookmarks.length}`);
+    onProgress?.({
+      step: 1,
+      detail: `已获取 ${bookmarks.length}/${limit} 条书签`,
+      percent: 100,
+      current: bookmarks.length,
+      total: limit,
+    });
   } else {
     throw new Error("请提供 Cookie 或 JSON 文件");
   }
 
   if (bookmarks.length === 0) {
+    await debugLog("fetchOnly:empty_result");
     throw new Error("未获取到任何书签");
   }
+  await debugLog(`fetchOnly:done count=${bookmarks.length}`);
 
-  // Step 2: AI Classification
-  onProgress?.({ step: 2, detail: `正在用 AI 分类 ${bookmarks.length} 条书签...` });
-  const classified = await classifyBookmarks(bookmarks, config);
-  onProgress?.({ step: 2, detail: `分类完成，${classified.categories.length} 个类别` });
+  return bookmarks;
+}
 
-  // Step 3: Generate Obsidian vault
-  onProgress?.({ step: 3, detail: "正在生成 Obsidian 知识库..." });
-  const result = await generateVault(classified.items, config.outputDir);
+async function readTextFileViaRust(
+  filePath: string,
+  onProgress?: (p: SyncProgress) => void,
+): Promise<string> {
+  onProgress?.({ step: 1, detail: "正在读取 JSON 文件...", percent: 10 });
+  const { invoke } = await getTauriInvoke();
+  return invoke<string>("read_text_file_rust", { path: filePath });
+}
+
+async function readBookmarksFromJsonViaRust(
+  filePath: string,
+  limit: number,
+  onProgress?: (p: SyncProgress) => void,
+): Promise<{ bookmarks: Bookmark[]; total: number; returned: number; truncated: boolean }> {
+  onProgress?.({ step: 1, detail: "正在解析 JSON 文件...", percent: 20 });
+  const { invoke } = await getTauriInvoke();
+  const loaded = await invoke<{
+    bookmarks_json: string;
+    total: number;
+    returned: number;
+    truncated: boolean;
+  }>("load_bookmarks_json", { path: filePath, limit });
+  onProgress?.({ step: 1, detail: "正在加载书签到内存...", percent: 70 });
+
+  return {
+    bookmarks: JSON.parse(loaded.bookmarks_json) as Bookmark[],
+    total: loaded.total,
+    returned: loaded.returned,
+    truncated: loaded.truncated,
+  };
+}
+
+// ─── Phase 2: Classify + Generate ───────────────────────────────
+
+export async function classifyAndGenerate(
+  bookmarks: Bookmark[],
+  config: SyncConfig,
+  onProgress?: (p: SyncProgress) => void,
+): Promise<SyncResult> {
+  await debugLog(`classifyAndGenerate:start count=${bookmarks.length}`);
+  onProgress?.({
+    step: 2,
+    detail: `正在用 AI 分类 ${bookmarks.length} 条书签...`,
+    percent: 0,
+    current: 0,
+    total: bookmarks.length,
+  });
+  const classified = await classifyBookmarks(bookmarks, config, onProgress);
+  await debugLog(`classifyAndGenerate:classified items=${classified.items.length} categories=${classified.categories.length}`);
+  onProgress?.({
+    step: 2,
+    detail: `分类完成，${classified.categories.length} 个类别`,
+    percent: 100,
+    current: bookmarks.length,
+    total: bookmarks.length,
+  });
+
+  onProgress?.({ step: 3, detail: "正在生成 Obsidian 知识库...", percent: 0 });
+  const result = await generateVault(classified.items, config.outputDir, onProgress);
+  await debugLog(`classifyAndGenerate:generated files=${result.filesCreated}`);
 
   return {
     filesCreated: result.filesCreated,
     categories: classified.categories,
-    outputDir: config.outputDir,
+    outputDir: result.outputDir,
     bookmarkCount: bookmarks.length,
+    // Keep UI payload bounded to avoid rendering and memory spikes on large exports.
+    previewItems: classified.items.slice(0, 200),
   };
+}
+
+// ─── Full Pipeline (convenience) ────────────────────────────────
+
+export async function syncBookmarks(
+  config: SyncConfig,
+  onProgress?: (p: SyncProgress) => void,
+): Promise<SyncResult> {
+  const bookmarks = await fetchOnly(config, onProgress);
+  return classifyAndGenerate(bookmarks, config, onProgress);
 }
 
 // ─── Bookmark Fetching (from CookieFetcher) ──────────────────────
@@ -143,28 +310,28 @@ async function fetchBookmarks(
     });
 
     const url = `https://x.com/i/api/graphql/${queryId}/Bookmarks?${params}`;
-    const res = await fetch(url, {
-      headers: {
-        authorization: `Bearer ${BEARER_TOKEN}`,
-        cookie: cookie,
-        "x-csrf-token": csrfToken,
-        "x-twitter-active-user": "yes",
-        "x-twitter-auth-type": "OAuth2Session",
-        "content-type": "application/json",
-        "user-agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      },
+    const body = await rustGet(url, {
+      authorization: `Bearer ${BEARER_TOKEN}`,
+      cookie: cookie,
+      "x-csrf-token": csrfToken,
+      "x-twitter-active-user": "yes",
+      "x-twitter-auth-type": "OAuth2Session",
+      "content-type": "application/json",
+      "user-agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
     });
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`X API 错误 ${res.status}: ${text.slice(0, 200)}`);
-    }
-
-    const json = await res.json();
+    const json = JSON.parse(body);
     const { items, nextCursor } = parseBookmarkResponse(json);
     bookmarks.push(...items);
-    onProgress?.({ step: 1, detail: `已获取 ${bookmarks.length} 条书签...` });
+    const current = Math.min(bookmarks.length, limit);
+    onProgress?.({
+      step: 1,
+      detail: `已获取 ${current}/${limit} 条书签...`,
+      percent: Math.round((current / limit) * 100),
+      current,
+      total: limit,
+    });
 
     if (!nextCursor || items.length === 0) break;
     cursor = nextCursor;
@@ -260,6 +427,7 @@ const PROVIDER_DEFAULTS: Record<string, { apiFormat: string; baseUrl: string; mo
   cohere: { apiFormat: "openai", baseUrl: "https://api.cohere.com/v1", model: "command-r" },
   deepinfra: { apiFormat: "openai", baseUrl: "https://api.deepinfra.com/v1/openai", model: "meta-llama/Meta-Llama-3-8B-Instruct" },
   perplexity: { apiFormat: "openai", baseUrl: "https://api.perplexity.ai", model: "llama-3.1-sonar-small-128k-online" },
+  custom: { apiFormat: "openai", baseUrl: "", model: "gpt-3.5-turbo" },
 };
 
 const CLASSIFICATION_PROMPT = `You are a bookmark classifier. Given a list of tweets/posts, classify each one into a category and subcategory, assign relevant tags, and write a brief summary.
@@ -285,9 +453,69 @@ Respond with summaries in Chinese.
 Tweets to classify:
 `;
 
+async function callAiJson(
+  apiFormat: "openai" | "anthropic" | "gemini" | "cohere",
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  prompt: string,
+): Promise<string> {
+  if (apiFormat === "anthropic") {
+    const body = JSON.stringify({
+      model,
+      max_tokens: 4000,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const res = await rustPost(`${baseUrl.replace(/\/$/, "")}/v1/messages`, {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    }, body);
+    const json = JSON.parse(res);
+    return json?.content?.[0]?.text ?? "";
+  }
+
+  if (apiFormat === "gemini") {
+    const endpoint = `${baseUrl.replace(/\/$/, "")}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const body = JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.2 },
+    });
+    const res = await rustPost(endpoint, { "content-type": "application/json" }, body);
+    const json = JSON.parse(res);
+    return json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  }
+
+  if (apiFormat === "cohere") {
+    const body = JSON.stringify({
+      model,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const res = await rustPost(`${baseUrl.replace(/\/$/, "")}/chat`, {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`,
+    }, body);
+    const json = JSON.parse(res);
+    return json?.message?.content?.[0]?.text ?? "";
+  }
+
+  const body = JSON.stringify({
+    model,
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.2,
+  });
+  const res = await rustPost(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+    "content-type": "application/json",
+    authorization: `Bearer ${apiKey}`,
+  }, body);
+  const json = JSON.parse(res);
+  return json?.choices?.[0]?.message?.content ?? "";
+}
+
 async function classifyBookmarks(
   bookmarks: Bookmark[],
   config: SyncConfig,
+  onProgress?: (p: SyncProgress) => void,
 ): Promise<{ items: ClassifiedBookmark[]; categories: string[] }> {
   const defaults = PROVIDER_DEFAULTS[config.provider] ?? {
     apiFormat: "openai",
@@ -304,6 +532,16 @@ async function classifyBookmarks(
   const allCategories = new Set<string>();
 
   for (let i = 0; i < bookmarks.length; i += batchSize) {
+    const batchIndex = Math.floor(i / batchSize) + 1;
+    const totalBatches = Math.ceil(bookmarks.length / batchSize);
+    onProgress?.({
+      step: 2,
+      detail: `AI 分类中：第 ${batchIndex}/${totalBatches} 批（${Math.min(i + batchSize, bookmarks.length)}/${bookmarks.length}）`,
+      percent: Math.round((Math.min(i + batchSize, bookmarks.length) / bookmarks.length) * 100),
+      current: Math.min(i + batchSize, bookmarks.length),
+      total: bookmarks.length,
+    });
+
     const batch = bookmarks.slice(i, i + batchSize);
     const tweetsText = batch
       .map((b) => `[ID: ${b.id}] @${b.authorHandle}: ${b.text.slice(0, 500)}`)
@@ -311,17 +549,16 @@ async function classifyBookmarks(
 
     const prompt = CLASSIFICATION_PROMPT + tweetsText;
 
-    const response = await sendDirectChat({
-      apiFormat: apiFormat as "openai" | "anthropic" | "gemini" | "cohere",
+    const text = await callAiJson(
+      apiFormat as "openai" | "anthropic" | "gemini" | "cohere",
       baseUrl,
-      apiKey: config.apiKey,
+      config.apiKey,
       model,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const text = response.content ?? "";
+      prompt,
+    );
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      await debugLog(`classifyBookmarks:json_parse_failed batch=${batchIndex}`);
       throw new Error("AI 返回的结果无法解析为 JSON");
     }
 
@@ -434,8 +671,13 @@ function renderCategoryIndex(category: string, items: ClassifiedBookmark[]): str
 async function generateVault(
   items: ClassifiedBookmark[],
   outputDir: string,
-): Promise<{ filesCreated: number }> {
-  await mkdir(outputDir, { recursive: true });
+  onProgress?: (p: SyncProgress) => void,
+): Promise<{ filesCreated: number; outputDir: string }> {
+  const resolvedOutputDir = await resolveOutputDirPath(outputDir);
+  await debugLog(`generateVault:start items=${items.length} output=${resolvedOutputDir}`);
+  const { mkdir, writeTextFile } = await getTauriFs();
+  const { join } = await getTauriPath();
+  await mkdir(resolvedOutputDir, { recursive: true });
 
   const byCategory = new Map<string, ClassifiedBookmark[]>();
   for (const item of items) {
@@ -444,9 +686,10 @@ async function generateVault(
   }
 
   let filesCreated = 0;
+  const totalFilesToWrite = items.length + byCategory.size + 1;
 
   for (const [category, categoryItems] of byCategory) {
-    const catDir = await join(outputDir, sanitizePath(category));
+    const catDir = await join(resolvedOutputDir, sanitizePath(category));
     await mkdir(catDir, { recursive: true });
 
     for (const item of categoryItems) {
@@ -454,11 +697,29 @@ async function generateVault(
       const content = renderBookmarkMarkdown(item);
       await writeTextFile(await join(catDir, filename), content);
       filesCreated++;
+      onProgress?.({
+        step: 3,
+        detail: `生成中：${filesCreated}/${totalFilesToWrite} 个文件`,
+        percent: Math.round((filesCreated / totalFilesToWrite) * 100),
+        current: filesCreated,
+        total: totalFilesToWrite,
+      });
+
+      if (filesCreated % 50 === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
     }
 
     const indexContent = renderCategoryIndex(category, categoryItems);
     await writeTextFile(await join(catDir, "_index.md"), indexContent);
     filesCreated++;
+    onProgress?.({
+      step: 3,
+      detail: `生成中：${filesCreated}/${totalFilesToWrite} 个文件`,
+      percent: Math.round((filesCreated / totalFilesToWrite) * 100),
+      current: filesCreated,
+      total: totalFilesToWrite,
+    });
   }
 
   // Root index
@@ -476,8 +737,16 @@ async function generateVault(
   for (const [category, catItems] of byCategory) {
     rootLines.push(`- **[[${sanitizePath(category)}/_index|${category}]]** (${catItems.length})`);
   }
-  await writeTextFile(await join(outputDir, "_index.md"), rootLines.join("\n"));
+  await writeTextFile(await join(resolvedOutputDir, "_index.md"), rootLines.join("\n"));
   filesCreated++;
+  onProgress?.({
+    step: 3,
+    detail: `生成完成：${filesCreated}/${totalFilesToWrite} 个文件`,
+    percent: 100,
+    current: filesCreated,
+    total: totalFilesToWrite,
+  });
+  await debugLog(`generateVault:done files=${filesCreated}`);
 
-  return { filesCreated };
+  return { filesCreated, outputDir: resolvedOutputDir };
 }

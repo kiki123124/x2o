@@ -4305,6 +4305,8 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 name = "tweetvault-desktop"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tauri",
@@ -4313,6 +4315,7 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-http",
  "tauri-plugin-shell",
+ "tokio",
 ]
 
 [[package]]

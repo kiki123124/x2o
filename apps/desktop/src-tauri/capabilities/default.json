@@ -22,12 +22,11 @@
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save",
-    "http:default",
     {
       "identifier": "http:default",
       "allow": [
         { "url": "https://**" },
-        { "url": "http://localhost:**" }
+        { "url": "http://**" }
       ]
     }
   ]
