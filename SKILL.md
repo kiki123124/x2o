@@ -8,17 +8,23 @@ description: |
   - AI-powered bookmark classification and summarization
   - Generating Obsidian-compatible markdown knowledge bases
   - Batch processing bookmarks from JSON exports
+  - Resolving t.co short URLs to real URLs
+  - Fetching full content from X Notes (long-form tweets)
 
   TRIGGERS:
   - "导出书签", "export bookmarks", "X 书签", "x2o", "书签分类"
   - "twitter bookmarks", "obsidian vault from bookmarks"
   - "classify my bookmarks", "organize bookmarks"
-version: 0.2.0
+version: 0.3.0
 ---
 
 # x2o — X Bookmark Export + AI Classification
 
 Export X (Twitter) bookmarks → AI classify → Obsidian knowledge vault. All local, no third-party servers.
+
+### What's New (v0.3.0)
+- t.co short URLs automatically resolved to real URLs
+- X Notes (long-form tweets) full content extraction
 
 ## Usage
 
