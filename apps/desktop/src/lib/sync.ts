@@ -148,59 +148,71 @@ export async function fetchOnly(
         } else {
           onProgress?.({ step: 1, detail: "未找到 bookmarks.json，尝试从 Markdown 重建...", percent: 10 });
 
-          // Walk markdown files
+          // Walk markdown files (Tauri 2 readDir returns { name, isDirectory, isFile })
           const mdFiles: string[] = [];
+          const { join: joinPath } = await getTauriPath();
           const walk = async (dir: string) => {
             const entries = await readDir(dir);
             for (const e of entries) {
               const name = e.name ?? "";
-              if (e.children) {
+              const fullPath = await joinPath(dir, name);
+              if (e.isDirectory) {
                 if (name === ".obsidian" || name === ".git") continue;
-                await walk(e.path);
-              } else {
+                await walk(fullPath);
+              } else if (e.isFile) {
                 if (!name.toLowerCase().endsWith(".md")) continue;
                 if (name === "_index.md") continue;
-                mdFiles.push(e.path);
+                mdFiles.push(fullPath);
               }
             }
           };
           await walk(resolved);
-          onProgress?.({ step: 1, detail: `已扫描 ${mdFiles.length} 个 md，开始提取 X 链接...`, percent: 20 });
+          onProgress?.({ step: 1, detail: `已扫描 ${mdFiles.length} 个 md 文件，开始读取...`, percent: 20 });
 
           const urlRe = /(https?:\/\/x\.com\/[^\s)]+\/status\/(\d+))|(https?:\/\/twitter\.com\/[^\s)]+\/status\/(\d+))/g;
           const rebuilt: Bookmark[] = [];
-          let noUrl = 0;
-          const seen = new Set<string>();
 
           for (let i = 0; i < mdFiles.length; i++) {
             if (rebuilt.length >= limit) break;
             const f = mdFiles[i];
             const raw = await readTextFile(f);
-            let m: RegExpExecArray | null;
-            let url = "";
-            let id = "";
-            while ((m = urlRe.exec(raw))) {
-              url = (m[1] || m[3] || "").trim();
-              id = (m[2] || m[4] || "").trim();
-              if (url && id) break;
-            }
-            if (!url || !id) {
-              noUrl++;
-              continue;
-            }
-            if (seen.has(id)) continue;
-            seen.add(id);
 
-            const handleMatch = url.match(/x\.com\/(.*?)\/(?:status|i\/status)\//);
-            const authorHandle = handleMatch?.[1] ?? "";
+            // Parse frontmatter if present
+            const fmMatch = raw.match(/^---\s*\n([\s\S]*?)\n---/);
+            const fm: Record<string, string> = {};
+            if (fmMatch) {
+              for (const line of fmMatch[1].split("\n")) {
+                const kv = line.match(/^(\w+):\s*"?(.*?)"?\s*$/);
+                if (kv) fm[kv[1]] = kv[2];
+              }
+            }
+
+            // Body = content after frontmatter
             const body = raw.replace(/^---[\s\S]*?---\s*/m, "").trim();
+            if (!body) continue;
+
+            // Try to extract URL and ID from content or frontmatter
+            let url = fm.url ?? "";
+            let id = "";
+            const urlMatch = urlRe.exec(url) ?? urlRe.exec(raw);
+            urlRe.lastIndex = 0;
+            if (urlMatch) {
+              url = (urlMatch[1] || urlMatch[3] || url).trim();
+              id = (urlMatch[2] || urlMatch[4] || "").trim();
+            }
+            // Fallback: use filename as id
+            const fname = f.split("/").pop()?.replace(/\.md$/, "") ?? "";
+            if (!id) id = fname || `md-${i}`;
+
+            const authorHandle = fm.author?.replace(/^@/, "") ?? "";
+
             rebuilt.push({
               id,
               text: body.slice(0, 4000),
-              authorName: authorHandle,
+              authorName: authorHandle || fname,
               authorHandle,
-              createdAt: "",
-              url,
+              createdAt: fm.date ?? "",
+              url: url || "",
               media: [],
               metrics: { likes: 0, retweets: 0, replies: 0 },
             });
@@ -208,7 +220,7 @@ export async function fetchOnly(
             if (rebuilt.length % 50 === 0) {
               onProgress?.({
                 step: 1,
-                detail: `从 md 重建中：${rebuilt.length} 条（无链接 ${noUrl}）`,
+                detail: `读取 md 中：${rebuilt.length}/${mdFiles.length}`,
                 percent: Math.round(20 + (i / Math.max(1, mdFiles.length)) * 70),
                 current: i + 1,
                 total: mdFiles.length,
@@ -217,16 +229,21 @@ export async function fetchOnly(
           }
 
           if (rebuilt.length === 0) {
-            throw new Error("未能从 Markdown 目录解析到任何 X 链接");
+            throw new Error("未能从 Markdown 目录读取到任何内容");
           }
 
           bookmarks = rebuilt;
-          onProgress?.({ step: 1, detail: `md 重建完成：${rebuilt.length} 条（无链接 ${noUrl}）`, percent: 100, current: rebuilt.length, total: rebuilt.length });
+          onProgress?.({ step: 1, detail: `已读取 ${rebuilt.length} 个 md 文件`, percent: 100, current: rebuilt.length, total: rebuilt.length });
           return bookmarks;
         }
       }
-    } catch {
-      // ignore and try JSON path as-is
+    } catch (dirErr) {
+      // If resolved is still a directory, don't try to read it as JSON
+      try {
+        const { stat } = await getTauriFs();
+        const m = await stat(resolved);
+        if (m.isDirectory) throw dirErr;
+      } catch { throw dirErr instanceof Error ? dirErr : new Error(String(dirErr)); }
     }
 
     const loaded = await readBookmarksFromJsonViaRust(resolved, limit, onProgress);

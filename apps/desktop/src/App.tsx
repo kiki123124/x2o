@@ -1,7 +1,7 @@
 import { createSignal, Show, For, createMemo } from "solid-js";
 import { fetchOnly, classifyAndGenerate, type SyncResult, type SyncConfig, type Bookmark, type ClassifiedBookmark } from "./lib/sync";
 
-type Page = "home" | "source" | "ai" | "fetching" | "preview" | "classifying" | "done";
+type Page = "home" | "source" | "ai" | "fetching" | "preview" | "classifying" | "done" | "reclassify";
 const PREVIEW_RENDER_LIMIT = 300;
 const BUILD_MARKER = "rv3-rust-fetch-20260303-1";
 
@@ -48,6 +48,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = createSignal("");
   const [expandedId, setExpandedId] = createSignal<string | null>(null);
   const [customName, setCustomName] = createSignal("");
+  const [reclassifyDir, setReclassifyDir] = createSignal("");
 
   const currentProvider = createMemo(() => {
     if (provider() === "custom") return { id: "custom", name: customName() || "自定义", org: "Custom", placeholder: "sk-...", color: "#6b7280", baseUrl: "", icon: "" };
@@ -141,6 +142,36 @@ export default function App() {
     } catch (err) { setError(String(err)); setPage("source"); }
   };
 
+  const pickReclassifyDir = async () => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const s = await open({ directory: true, title: "选择已有的输出文件夹（含 bookmarks.json 或 Markdown）" });
+      if (s) setReclassifyDir(s as string);
+    } catch {}
+  };
+
+  const handleReclassify = async () => {
+    setError("");
+    // Step 1: Load bookmarks from folder
+    setPage("fetching"); setProgressPercent(0); setProgressCurrent(null); setProgressTotal(null); setProgressDetail("正在从文件夹加载书签...");
+    try {
+      const cfg = { ...getConfig(), inputPath: reclassifyDir(), outputDir: reclassifyDir() };
+      const bm = await fetchOnly(cfg, applyProgress);
+      setFetchedBookmarks(bm);
+    } catch (err) { setError(String(err)); setPage("reclassify"); return; }
+
+    // Step 2: Classify directly (skip preview)
+    setPage("classifying"); setProgressStep(2); setProgressPercent(0); setProgressCurrent(null); setProgressTotal(null); setProgressDetail("正在用 AI 重新分类...");
+    try {
+      const cfg = { ...getConfig(), outputDir: reclassifyDir() };
+      const res = await classifyAndGenerate(fetchedBookmarks(), cfg, (p) => {
+        setProgressStep(p.step); applyProgress(p);
+      });
+      setFetchedBookmarks([]);
+      setResult(res); setPage("done");
+    } catch (err) { setError(String(err)); setPage("reclassify"); }
+  };
+
   const handleClassify = async () => {
     setError(""); setPage("classifying"); setProgressStep(2); setProgressPercent(0); setProgressCurrent(null); setProgressTotal(null); setProgressDetail("正在用 AI 分类...");
     try {
@@ -163,6 +194,7 @@ export default function App() {
       { id: "source" as Page, label: "数据源", icon: "◉", active: p === "source" },
       { id: "ai" as Page, label: "AI 模型", icon: "◈", active: p === "ai" },
       { id: "preview" as Page, label: "书签", icon: "☰", active: p === "preview" || p === "fetching", disabled: fetchedBookmarks().length === 0 && p !== "fetching" },
+      { id: "reclassify" as Page, label: "重分类", icon: "↻", active: p === "reclassify" },
       { id: "done" as Page, label: "结果", icon: "✓", active: p === "done" || p === "classifying", disabled: !result() && p !== "classifying" },
     ];
   });
@@ -267,15 +299,11 @@ export default function App() {
               <p class="text-[12px] mb-5" style={{ color: "var(--text-secondary)" }}>选择书签来源，Cookie 抓取或 JSON 导入</p>
 
               <Card>
-                <FieldLabel>JSON 文件 / 输出目录</FieldLabel>
+                <FieldLabel>JSON 文件</FieldLabel>
                 <div class="flex gap-2">
-                  <div class="flex-1"><Field value={inputPath()} onInput={setInputPath} placeholder="选择 bookmarks.json 或选择输出目录（自动识别）" /></div>
+                  <div class="flex-1"><Field value={inputPath()} onInput={setInputPath} placeholder="选择 bookmarks.json 文件" /></div>
                   <Btn onClick={pickJsonFile} secondary>选文件</Btn>
-                  <Btn onClick={pickInputDir} secondary>选文件夹</Btn>
                 </div>
-                <p class="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>
-                  💡 支持重分类：选择上一次的输出目录（里面有 bookmarks.json）即可。
-                </p>
 
                 <div class="flex items-center gap-3 my-4">
                   <div class="flex-1 h-px" style={{ background: "var(--border)" }} />
@@ -376,6 +404,61 @@ export default function App() {
                   style={{ width: `${progressPercent()}%`, background: "var(--accent)" }} />
               </div>
               <p class="text-[11px] mt-1.5" style={{ color: "var(--text-tertiary)" }}>{progressPercent()}%</p>
+            </div>
+          </Show>
+
+          {/* RECLASSIFY */}
+          <Show when={page() === "reclassify"}>
+            <div class="animate-fade-in-right max-w-lg">
+              <h2 class="text-[18px] font-semibold mb-1">重新分类</h2>
+              <p class="text-[12px] mb-5" style={{ color: "var(--text-secondary)" }}>选择已有的输出文件夹，用 AI 重新分类</p>
+
+              <Card>
+                <FieldLabel>输出文件夹</FieldLabel>
+                <div class="flex gap-2">
+                  <div class="flex-1"><Field value={reclassifyDir()} onInput={setReclassifyDir} placeholder="选择之前导出的文件夹" /></div>
+                  <Btn onClick={pickReclassifyDir} secondary>选文件夹</Btn>
+                </div>
+                <p class="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>
+                  自动识别 bookmarks.json 或从 Markdown 文件重建书签
+                </p>
+
+                <div class="my-4 h-px" style={{ background: "var(--border)" }} />
+
+                <FieldLabel>AI 提供商</FieldLabel>
+                <button class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-[12px] border transition-all hover-lift"
+                  style={{ background: "var(--bg)", color: "var(--text)", "border-color": "var(--border)" }}
+                  onClick={() => setDrawerOpen(true)}>
+                  <span class="flex items-center gap-2">
+                    <ProviderIcon icon={currentProvider().icon} name={currentProvider().name} color={currentProvider().color} size={20} />
+                    <span class="font-medium">{currentProvider().name}</span>
+                    <span class="text-[10px]" style={{ color: "var(--text-tertiary)" }}>{currentProvider().org}</span>
+                  </span>
+                  <span style={{ color: "var(--text-tertiary)" }}>▾</span>
+                </button>
+
+                <Show when={provider() !== "ollama"}>
+                  <FieldLabel class="mt-3">API Key</FieldLabel>
+                  <Field value={apiKey()} onInput={setApiKey} placeholder={currentProvider().placeholder} type="password" />
+                </Show>
+
+                <FieldLabel class="mt-3">API 地址</FieldLabel>
+                <Field value={baseUrl()} onInput={setBaseUrl} placeholder={currentProvider().baseUrl} />
+
+                <FieldLabel class="mt-3">模型（留空用默认）</FieldLabel>
+                <Field value={model()} onInput={setModel} placeholder="留空使用默认模型" />
+              </Card>
+
+              <Show when={error()}>
+                <div class="mt-3 px-4 py-2.5 rounded-xl text-[12px] animate-fade-in"
+                  style={{ background: "var(--error-soft)", color: "var(--error)" }}>{error()}</div>
+              </Show>
+
+              <div class="mt-5">
+                <Btn onClick={handleReclassify} disabled={!reclassifyDir() || !canClassify()}>
+                  开始重新分类
+                </Btn>
+              </div>
             </div>
           </Show>
 
