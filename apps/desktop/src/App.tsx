@@ -99,6 +99,14 @@ export default function App() {
     } catch {}
   };
 
+  const pickInputDir = async () => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const s = await open({ directory: true, title: "选择输出目录（将自动读取 bookmarks.json）" });
+      if (s) setInputPath(s as string);
+    } catch {}
+  };
+
   const pickOutputDir = async () => {
     try {
       const { open } = await import("@tauri-apps/plugin-dialog");
@@ -259,11 +267,15 @@ export default function App() {
               <p class="text-[12px] mb-5" style={{ color: "var(--text-secondary)" }}>选择书签来源，Cookie 抓取或 JSON 导入</p>
 
               <Card>
-                <FieldLabel>JSON 文件</FieldLabel>
+                <FieldLabel>JSON 文件 / 输出目录</FieldLabel>
                 <div class="flex gap-2">
-                  <div class="flex-1"><Field value={inputPath()} onInput={setInputPath} placeholder="选择文件或输入路径" /></div>
-                  <Btn onClick={pickJsonFile} secondary>选择</Btn>
+                  <div class="flex-1"><Field value={inputPath()} onInput={setInputPath} placeholder="选择 bookmarks.json 或选择输出目录（自动识别）" /></div>
+                  <Btn onClick={pickJsonFile} secondary>选文件</Btn>
+                  <Btn onClick={pickInputDir} secondary>选文件夹</Btn>
                 </div>
+                <p class="text-[10px] mt-1" style={{ color: "var(--text-tertiary)" }}>
+                  💡 支持重分类：选择上一次的输出目录（里面有 bookmarks.json）即可。
+                </p>
 
                 <div class="flex items-center gap-3 my-4">
                   <div class="flex-1 h-px" style={{ background: "var(--border)" }} />

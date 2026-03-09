@@ -133,7 +133,20 @@ export async function fetchOnly(
   let bookmarks: Bookmark[];
 
   if (config.inputPath) {
-    const loaded = await readBookmarksFromJsonViaRust(config.inputPath, limit, onProgress);
+    // Allow selecting a folder (auto-read <dir>/bookmarks.json)
+    let resolved = config.inputPath;
+    try {
+      const { stat } = await getTauriFs();
+      const meta = await stat(resolved);
+      if (meta.isDirectory) {
+        const { join } = await getTauriPath();
+        resolved = await join(resolved, "bookmarks.json");
+      }
+    } catch {
+      // ignore
+    }
+
+    const loaded = await readBookmarksFromJsonViaRust(resolved, limit, onProgress);
     bookmarks = loaded.bookmarks;
     if (loaded.truncated) {
       onProgress?.({
@@ -168,7 +181,7 @@ export async function fetchOnly(
       total: limit,
     });
   } else {
-    throw new Error("请提供 Cookie 或 JSON 文件");
+    throw new Error("请提供 Cookie 或 JSON 文件/文件夹");
   }
 
   if (bookmarks.length === 0) {
