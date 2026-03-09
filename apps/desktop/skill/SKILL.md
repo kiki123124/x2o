@@ -10,19 +10,22 @@ description: |
   - Batch processing bookmarks from JSON exports
   - Resolving t.co short URLs to real URLs
   - Fetching full content from X Notes (long-form tweets)
+  - Reclassifying existing markdown vaults with a different AI
 
   TRIGGERS:
   - "导出书签", "export bookmarks", "X 书签", "x2o", "书签分类"
   - "twitter bookmarks", "obsidian vault from bookmarks"
   - "classify my bookmarks", "organize bookmarks"
-version: 0.3.0
+version: 0.4.0
 ---
 
 # x2o — X Bookmark Export + AI Classification
 
 Export X (Twitter) bookmarks → AI classify → Obsidian knowledge vault. All local, no third-party servers.
 
-### What's New (v0.3.0)
+### What's New (v0.4.0)
+- Standalone reclassify: pick existing output folder, reclassify with different AI
+- Reads markdown content directly (no X link dependency)
 - t.co short URLs automatically resolved to real URLs
 - X Notes (long-form tweets) full content extraction
 
@@ -66,19 +69,9 @@ npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
   --output ~/x2o-output
 ```
 
-Notes:
-- Passing a directory to `--input/--reclassify/--md-dir` will first look for `<dir>/bookmarks.json`.
-- If not found, it will try to parse X URLs from `.md` files and reconstruct a minimal bookmarks list.
-
-### From existing JSON file (skip fetching):
-
-```bash
-npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
-  --input bookmarks.json \
-  --provider openai \
-  --api-key "sk-..." \
-  --output ~/x2o-output
-```
+> Notes:
+> - Passing a directory to `--input/--reclassify/--md-dir` will first look for `<dir>/bookmarks.json`.
+> - If not found, it will try to parse X URLs from `.md` files and reconstruct a minimal bookmarks list.
 
 ## Parameters
 
@@ -86,6 +79,8 @@ npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
 |------|----------|-------------|
 | `--cookie` | Yes* | X browser cookie (must contain `ct0`) |
 | `--input` | Yes* | Path to existing bookmarks JSON **or an output folder containing `bookmarks.json`** (alternative to cookie) |
+| `--reclassify` | No | Alias of `--input` |
+| `--md-dir` | No | Path to a Markdown vault folder (only `.md` files). If the folder has `bookmarks.json`, it will use that first. |
 | `--provider` | No | AI provider (default: `openai`): `openai`, `claude`, `deepseek`, `gemini`, `ollama`, `groq`, `moonshot`, `qwen`, `zhipu`, `siliconflow`, `mistral`, `together`, `fireworks`, `xai`, `openrouter`, `cohere`, `deepinfra`, `perplexity` |
 | `--api-key` | Yes** | API key for the chosen provider (not required for `ollama`, or when using `--fetch-only`) |
 | `--output` | No | Output directory (default: `~/x2o-output`) |

@@ -13,6 +13,7 @@
 - 📥 **一键抓取** — 粘贴浏览器 Cookie，自动拉取全部 X 书签
 - 🤖 **AI 智能分类** — 支持 18+ AI 服务商，自动归类 + 生成中文摘要
 - 📚 **Obsidian 知识库** — 按分类生成 Markdown 文件，直接用 Obsidian 打开
+- 🔄 **重新分类** — 选已有文件夹，换 AI 模型重新分类，不需要重新抓取
 - 🔗 **t.co 短链接解析** — 自动将 t.co 短链接还原为真实 URL
 - 📝 **长推文完整抓取** — 支持 X Notes 长文，不截断不丢内容
 - 🔒 **隐私优先** — 数据全部本地处理，不经过第三方服务器
@@ -44,9 +45,17 @@ npx skills add kiki123124/x2o
 ```bash
 npx tsx https://raw.githubusercontent.com/kiki123124/x2o/main/scripts/x2o.ts \
   --cookie "<你的 X Cookie>" \
-  --provider deepseek \
+  --provider openai \
   --api-key "sk-..." \
   --output ~/x2o-output
+
+# 其他示例：Claude / Gemini / Ollama
+# Claude
+# --provider claude --api-key "sk-ant-..."
+# Gemini
+# --provider gemini --api-key "..."
+# Ollama（本地，不需要 api-key）
+# --provider ollama --model llama3.2
 ```
 
 ### 从源码构建
@@ -81,6 +90,30 @@ pnpm tauri build
 | ... | 还支持 OpenRouter / Moonshot / Qwen / SiliconFlow / Groq 等 18+ 服务商 |
 
 ### 3️⃣ 开始导出 📚
+
+**重分类（已有书签，不重新抓取）：**
+
+如果你之前跑过一次，输出目录里会有 `bookmarks.json`。你可以直接对这个 JSON 重新做 AI 分类（换模型/换 provider 都行）：
+
+```bash
+npx tsx https://raw.githubusercontent.com/kiki123124/x2o/main/scripts/x2o.ts \
+  --input ~/x2o-output \
+  --provider openai \
+  --api-key "sk-..." \
+  --output ~/x2o-output
+```
+
+**从已生成的 Markdown Vault 重建再分类（只有 md，没有 bookmarks.json 也行）：**
+
+```bash
+npx tsx https://raw.githubusercontent.com/kiki123124/x2o/main/scripts/x2o.ts \
+  --md-dir ~/x2o-output \
+  --provider openai \
+  --api-key "sk-..." \
+  --output ~/x2o-output
+```
+
+> 说明：`--input/--reclassify/--md-dir` 都支持传目录：优先读取 `<dir>/bookmarks.json`；如果不存在，会尝试从目录内的 `.md` 文件中解析出 X 链接并重建书签。
 
 **桌面 App：**
 1. 点击 **获取书签** → 预览抓取结果
