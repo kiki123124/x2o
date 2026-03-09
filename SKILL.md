@@ -33,10 +33,15 @@ Run the CLI script via `npx tsx`:
 ```bash
 npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
   --cookie "<X cookie string>" \
-  --provider deepseek \
+  --provider openai \
   --api-key "sk-..." \
   --output ~/x2o-output \
   --limit 100
+
+# 也可以换成其他 provider：
+# --provider claude  --api-key "sk-ant-..."
+# --provider gemini  --api-key "..."
+# --provider ollama  --model llama3.2   （本地 Ollama 不需要 api-key）
 ```
 
 ### From existing JSON file (skip fetching):
@@ -55,8 +60,8 @@ npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
 |------|----------|-------------|
 | `--cookie` | Yes* | X browser cookie (must contain `ct0`) |
 | `--input` | Yes* | Path to existing bookmarks JSON (alternative to cookie) |
-| `--provider` | Yes | AI provider: `openai`, `claude`, `deepseek`, `gemini`, `ollama`, `groq`, `moonshot`, `qwen`, `zhipu`, `siliconflow`, `mistral`, `together`, `fireworks`, `xai`, `openrouter`, `cohere`, `deepinfra`, `perplexity` |
-| `--api-key` | Yes** | API key for the chosen provider |
+| `--provider` | No | AI provider (default: `openai`): `openai`, `claude`, `deepseek`, `gemini`, `ollama`, `groq`, `moonshot`, `qwen`, `zhipu`, `siliconflow`, `mistral`, `together`, `fireworks`, `xai`, `openrouter`, `cohere`, `deepinfra`, `perplexity` |
+| `--api-key` | Yes** | API key for the chosen provider (not required for `ollama`, or when using `--fetch-only`) |
 | `--output` | No | Output directory (default: `~/x2o-output`) |
 | `--limit` | No | Max bookmarks to fetch (default: 800) |
 | `--model` | No | Override default model for the provider |
