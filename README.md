@@ -44,9 +44,17 @@ npx skills add kiki123124/x2o
 ```bash
 npx tsx https://raw.githubusercontent.com/kiki123124/x2o/main/scripts/x2o.ts \
   --cookie "<你的 X Cookie>" \
-  --provider deepseek \
+  --provider openai \
   --api-key "sk-..." \
   --output ~/x2o-output
+
+# 其他示例：Claude / Gemini / Ollama
+# Claude
+# --provider claude --api-key "sk-ant-..."
+# Gemini
+# --provider gemini --api-key "..."
+# Ollama（本地，不需要 api-key）
+# --provider ollama --model llama3.2
 ```
 
 ### 从源码构建
