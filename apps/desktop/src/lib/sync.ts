@@ -146,7 +146,7 @@ export async function fetchOnly(
         if (await exists(jsonPath)) {
           resolved = jsonPath;
         } else {
-          onProgress?.({ step: 1, detail: "未找到 bookmarks.json，尝试从 Markdown 重建...", percent: 15 });
+          onProgress?.({ step: 1, detail: "未找到 bookmarks.json，尝试从 Markdown 重建...", percent: 10 });
 
           // Walk markdown files
           const mdFiles: string[] = [];
@@ -165,11 +165,16 @@ export async function fetchOnly(
             }
           };
           await walk(resolved);
+          onProgress?.({ step: 1, detail: `已扫描 ${mdFiles.length} 个 md，开始提取 X 链接...`, percent: 20 });
 
           const urlRe = /(https?:\/\/x\.com\/[^\s)]+\/status\/(\d+))|(https?:\/\/twitter\.com\/[^\s)]+\/status\/(\d+))/g;
           const rebuilt: Bookmark[] = [];
-          for (const f of mdFiles) {
+          let noUrl = 0;
+          const seen = new Set<string>();
+
+          for (let i = 0; i < mdFiles.length; i++) {
             if (rebuilt.length >= limit) break;
+            const f = mdFiles[i];
             const raw = await readTextFile(f);
             let m: RegExpExecArray | null;
             let url = "";
@@ -179,7 +184,13 @@ export async function fetchOnly(
               id = (m[2] || m[4] || "").trim();
               if (url && id) break;
             }
-            if (!url || !id) continue;
+            if (!url || !id) {
+              noUrl++;
+              continue;
+            }
+            if (seen.has(id)) continue;
+            seen.add(id);
+
             const handleMatch = url.match(/x\.com\/(.*?)\/(?:status|i\/status)\//);
             const authorHandle = handleMatch?.[1] ?? "";
             const body = raw.replace(/^---[\s\S]*?---\s*/m, "").trim();
@@ -193,6 +204,16 @@ export async function fetchOnly(
               media: [],
               metrics: { likes: 0, retweets: 0, replies: 0 },
             });
+
+            if (rebuilt.length % 50 === 0) {
+              onProgress?.({
+                step: 1,
+                detail: `从 md 重建中：${rebuilt.length} 条（无链接 ${noUrl}）`,
+                percent: Math.round(20 + (i / Math.max(1, mdFiles.length)) * 70),
+                current: i + 1,
+                total: mdFiles.length,
+              });
+            }
           }
 
           if (rebuilt.length === 0) {
@@ -200,7 +221,7 @@ export async function fetchOnly(
           }
 
           bookmarks = rebuilt;
-          onProgress?.({ step: 1, detail: `从 Markdown 重建 ${rebuilt.length} 条书签`, percent: 100, current: rebuilt.length, total: rebuilt.length });
+          onProgress?.({ step: 1, detail: `md 重建完成：${rebuilt.length} 条（无链接 ${noUrl}）`, percent: 100, current: rebuilt.length, total: rebuilt.length });
           return bookmarks;
         }
       }

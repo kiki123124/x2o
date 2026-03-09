@@ -62,8 +62,15 @@ function listMarkdownFiles(dir: string): string[] {
 
 function parseBookmarksFromMarkdownDir(dir: string, limit: number): Bookmark[] {
   const files = listMarkdownFiles(dir).filter((p) => !p.endsWith("_index.md"));
+  console.log(`🧾 扫描到 ${files.length} 个 Markdown 文件（排除 _index.md）`);
+
   const items: Bookmark[] = [];
   const urlRe = /(https?:\/\/x\.com\/[^\s)]+\/status\/(\d+))|(https?:\/\/twitter\.com\/[^\s)]+\/status\/(\d+))/g;
+
+  let parsed = 0;
+  let noUrl = 0;
+  let dup = 0;
+  const seen = new Set<string>();
 
   for (const file of files) {
     if (items.length >= limit) break;
@@ -78,7 +85,16 @@ function parseBookmarksFromMarkdownDir(dir: string, limit: number): Bookmark[] {
       id = (m[2] || m[4] || "").trim();
       if (url && id) break;
     }
-    if (!url || !id) continue;
+    if (!url || !id) {
+      noUrl++;
+      continue;
+    }
+
+    if (seen.has(id)) {
+      dup++;
+      continue;
+    }
+    seen.add(id);
 
     // author handle from url
     const handleMatch = url.match(/x\.com\/(.*?)\/(?:status|i\/status)\//);
@@ -102,8 +118,14 @@ function parseBookmarksFromMarkdownDir(dir: string, limit: number): Bookmark[] {
       media: [],
       metrics: { likes: 0, retweets: 0, replies: 0 },
     });
+    parsed++;
+
+    if (parsed % 50 === 0) {
+      console.log(`… 已从 md 重建 ${parsed} 条（无链接 ${noUrl}，重复 ${dup}）`);
+    }
   }
 
+  console.log(`✅ md 重建完成：${parsed} 条（无链接 ${noUrl}，重复 ${dup}，上限 ${limit}）`);
   return items;
 }
 
