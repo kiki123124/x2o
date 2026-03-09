@@ -102,7 +102,17 @@ npx tsx https://raw.githubusercontent.com/kiki123124/x2o/main/scripts/x2o.ts \
   --output ~/x2o-output
 ```
 
-> 说明：`--input` 既可以传 `bookmarks.json` 文件路径，也可以直接传输出目录（会自动读取 `<dir>/bookmarks.json`）。
+**从已生成的 Markdown Vault 重建再分类（只有 md，没有 bookmarks.json 也行）：**
+
+```bash
+npx tsx https://raw.githubusercontent.com/kiki123124/x2o/main/scripts/x2o.ts \
+  --md-dir ~/x2o-output \
+  --provider openai \
+  --api-key "sk-..." \
+  --output ~/x2o-output
+```
+
+> 说明：`--input/--reclassify/--md-dir` 都支持传目录：优先读取 `<dir>/bookmarks.json`；如果不存在，会尝试从目录内的 `.md` 文件中解析出 X 链接并重建书签。
 
 **桌面 App：**
 1. 点击 **获取书签** → 预览抓取结果

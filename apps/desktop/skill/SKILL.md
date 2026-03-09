@@ -56,6 +56,20 @@ npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
   --output ~/x2o-output
 ```
 
+### Rebuild from Markdown vault (only .md files) and re-classify:
+
+```bash
+npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
+  --md-dir ~/x2o-output \
+  --provider openai \
+  --api-key "sk-..." \
+  --output ~/x2o-output
+```
+
+Notes:
+- Passing a directory to `--input/--reclassify/--md-dir` will first look for `<dir>/bookmarks.json`.
+- If not found, it will try to parse X URLs from `.md` files and reconstruct a minimal bookmarks list.
+
 ### From existing JSON file (skip fetching):
 
 ```bash

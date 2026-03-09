@@ -26,25 +26,91 @@ const args = parseArgs();
 const COOKIE = args["cookie"] || "";
 const INPUT_PATH_RAW = args["input"] || "";
 const RECLASSIFY_PATH = args["reclassify"] || "";
-let INPUT_PATH = INPUT_PATH_RAW || RECLASSIFY_PATH;
+const MD_DIR = args["md-dir"] || args["vault"] || "";
+let INPUT_PATH = INPUT_PATH_RAW || RECLASSIFY_PATH || MD_DIR;
 const PROVIDER = args["provider"] || "openai";
 const API_KEY = args["api-key"] || "";
 const MODEL = args["model"] || "";
 const BASE_URL = args["base-url"] || "";
 const OUTPUT_DIR = (args["output"] || "~/x2o-output").replace(/^~/, os.homedir());
 
-// If --input points to a directory, auto-read <dir>/bookmarks.json
+function looksLikeDir(p: string): boolean {
+  try {
+    return fs.existsSync(p) && fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function listMarkdownFiles(dir: string): string[] {
+  const out: string[] = [];
+  const walk = (d: string) => {
+    for (const ent of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, ent.name);
+      if (ent.isDirectory()) {
+        // skip obsidian metadata
+        if (ent.name === ".obsidian" || ent.name === ".git") continue;
+        walk(full);
+      } else if (ent.isFile() && ent.name.toLowerCase().endsWith(".md")) {
+        out.push(full);
+      }
+    }
+  };
+  walk(dir);
+  return out;
+}
+
+function parseBookmarksFromMarkdownDir(dir: string, limit: number): Bookmark[] {
+  const files = listMarkdownFiles(dir).filter((p) => !p.endsWith("_index.md"));
+  const items: Bookmark[] = [];
+  const urlRe = /(https?:\/\/x\.com\/[^\s)]+\/status\/(\d+))|(https?:\/\/twitter\.com\/[^\s)]+\/status\/(\d+))/g;
+
+  for (const file of files) {
+    if (items.length >= limit) break;
+    const raw = fs.readFileSync(file, "utf-8");
+
+    // try to extract url + id
+    let m: RegExpExecArray | null;
+    let url = "";
+    let id = "";
+    while ((m = urlRe.exec(raw))) {
+      url = (m[1] || m[3] || "").trim();
+      id = (m[2] || m[4] || "").trim();
+      if (url && id) break;
+    }
+    if (!url || !id) continue;
+
+    // author handle from url
+    const handleMatch = url.match(/x\.com\/(.*?)\/(?:status|i\/status)\//);
+    const authorHandle = handleMatch?.[1] ?? "";
+
+    // naive frontmatter date
+    const dateMatch = raw.match(/\n(?:date|createdAt):\s*"?([^"\n]+)"?/i);
+    const createdAt = (dateMatch?.[1] ?? "").trim();
+
+    // remove yaml frontmatter
+    const body = raw.replace(/^---[\s\S]*?---\s*/m, "").trim();
+    const text = body.slice(0, 4000);
+
+    items.push({
+      id,
+      text,
+      authorName: authorHandle,
+      authorHandle,
+      createdAt,
+      url,
+      media: [],
+      metrics: { likes: 0, retweets: 0, replies: 0 },
+    });
+  }
+
+  return items;
+}
+
+// Normalize input path
 if (INPUT_PATH) {
   const p = INPUT_PATH.replace(/^~/, os.homedir());
-  try {
-    if (fs.existsSync(p) && fs.statSync(p).isDirectory()) {
-      INPUT_PATH = path.join(p, "bookmarks.json");
-    } else {
-      INPUT_PATH = p;
-    }
-  } catch {
-    INPUT_PATH = p;
-  }
+  INPUT_PATH = p;
 }
 
 const LIMIT = parseInt(args["limit"] || "800", 10);
@@ -461,12 +527,29 @@ async function main() {
   let bookmarks: Bookmark[];
 
   if (INPUT_PATH) {
-    console.log(`📂 从文件加载：${INPUT_PATH}`);
-    const raw = fs.readFileSync(INPUT_PATH, "utf-8");
-    const parsed = JSON.parse(raw);
-    const arr = Array.isArray(parsed) ? parsed : parsed.bookmarks ?? [];
-    bookmarks = arr.slice(0, LIMIT);
-    console.log(`📥 加载了 ${bookmarks.length} 条书签`);
+    // If a directory is provided, prefer <dir>/bookmarks.json; otherwise fall back to parsing markdown vault.
+    if (looksLikeDir(INPUT_PATH)) {
+      const jsonPath = path.join(INPUT_PATH, "bookmarks.json");
+      if (fs.existsSync(jsonPath)) {
+        console.log(`📂 从目录读取：${jsonPath}`);
+        const raw = fs.readFileSync(jsonPath, "utf-8");
+        const parsed = JSON.parse(raw);
+        const arr = Array.isArray(parsed) ? parsed : parsed.bookmarks ?? [];
+        bookmarks = arr.slice(0, LIMIT);
+        console.log(`📥 加载了 ${bookmarks.length} 条书签`);
+      } else {
+        console.log(`📂 从 Markdown 目录重建书签：${INPUT_PATH}`);
+        bookmarks = parseBookmarksFromMarkdownDir(INPUT_PATH, LIMIT);
+        console.log(`📥 重建了 ${bookmarks.length} 条书签（从 md）`);
+      }
+    } else {
+      console.log(`📂 从文件加载：${INPUT_PATH}`);
+      const raw = fs.readFileSync(INPUT_PATH, "utf-8");
+      const parsed = JSON.parse(raw);
+      const arr = Array.isArray(parsed) ? parsed : parsed.bookmarks ?? [];
+      bookmarks = arr.slice(0, LIMIT);
+      console.log(`📥 加载了 ${bookmarks.length} 条书签`);
+    }
   } else {
     console.log(`🌐 从 X 拉取书签（上限 ${LIMIT}）`);
     bookmarks = await fetchBookmarks(COOKIE, LIMIT);

@@ -133,17 +133,79 @@ export async function fetchOnly(
   let bookmarks: Bookmark[];
 
   if (config.inputPath) {
-    // Allow selecting a folder (auto-read <dir>/bookmarks.json)
+    // Allow selecting a folder:
+    // - If <dir>/bookmarks.json exists: use it
+    // - Else: try to reconstruct from markdown vault (.md files)
     let resolved = config.inputPath;
     try {
-      const { stat } = await getTauriFs();
+      const { stat, exists, readDir, readTextFile } = await getTauriFs();
       const meta = await stat(resolved);
       if (meta.isDirectory) {
         const { join } = await getTauriPath();
-        resolved = await join(resolved, "bookmarks.json");
+        const jsonPath = await join(resolved, "bookmarks.json");
+        if (await exists(jsonPath)) {
+          resolved = jsonPath;
+        } else {
+          onProgress?.({ step: 1, detail: "未找到 bookmarks.json，尝试从 Markdown 重建...", percent: 15 });
+
+          // Walk markdown files
+          const mdFiles: string[] = [];
+          const walk = async (dir: string) => {
+            const entries = await readDir(dir);
+            for (const e of entries) {
+              const name = e.name ?? "";
+              if (e.children) {
+                if (name === ".obsidian" || name === ".git") continue;
+                await walk(e.path);
+              } else {
+                if (!name.toLowerCase().endsWith(".md")) continue;
+                if (name === "_index.md") continue;
+                mdFiles.push(e.path);
+              }
+            }
+          };
+          await walk(resolved);
+
+          const urlRe = /(https?:\/\/x\.com\/[^\s)]+\/status\/(\d+))|(https?:\/\/twitter\.com\/[^\s)]+\/status\/(\d+))/g;
+          const rebuilt: Bookmark[] = [];
+          for (const f of mdFiles) {
+            if (rebuilt.length >= limit) break;
+            const raw = await readTextFile(f);
+            let m: RegExpExecArray | null;
+            let url = "";
+            let id = "";
+            while ((m = urlRe.exec(raw))) {
+              url = (m[1] || m[3] || "").trim();
+              id = (m[2] || m[4] || "").trim();
+              if (url && id) break;
+            }
+            if (!url || !id) continue;
+            const handleMatch = url.match(/x\.com\/(.*?)\/(?:status|i\/status)\//);
+            const authorHandle = handleMatch?.[1] ?? "";
+            const body = raw.replace(/^---[\s\S]*?---\s*/m, "").trim();
+            rebuilt.push({
+              id,
+              text: body.slice(0, 4000),
+              authorName: authorHandle,
+              authorHandle,
+              createdAt: "",
+              url,
+              media: [],
+              metrics: { likes: 0, retweets: 0, replies: 0 },
+            });
+          }
+
+          if (rebuilt.length === 0) {
+            throw new Error("未能从 Markdown 目录解析到任何 X 链接");
+          }
+
+          bookmarks = rebuilt;
+          onProgress?.({ step: 1, detail: `从 Markdown 重建 ${rebuilt.length} 条书签`, percent: 100, current: rebuilt.length, total: rebuilt.length });
+          return bookmarks;
+        }
       }
     } catch {
-      // ignore
+      // ignore and try JSON path as-is
     }
 
     const loaded = await readBookmarksFromJsonViaRust(resolved, limit, onProgress);
