@@ -24,17 +24,34 @@ function parseArgs(): Record<string, string> {
 
 const args = parseArgs();
 const COOKIE = args["cookie"] || "";
-const INPUT_PATH = args["input"] || "";
+const INPUT_PATH_RAW = args["input"] || "";
+const RECLASSIFY_PATH = args["reclassify"] || "";
+let INPUT_PATH = INPUT_PATH_RAW || RECLASSIFY_PATH;
 const PROVIDER = args["provider"] || "openai";
 const API_KEY = args["api-key"] || "";
 const MODEL = args["model"] || "";
 const BASE_URL = args["base-url"] || "";
 const OUTPUT_DIR = (args["output"] || "~/x2o-output").replace(/^~/, os.homedir());
+
+// If --input points to a directory, auto-read <dir>/bookmarks.json
+if (INPUT_PATH) {
+  const p = INPUT_PATH.replace(/^~/, os.homedir());
+  try {
+    if (fs.existsSync(p) && fs.statSync(p).isDirectory()) {
+      INPUT_PATH = path.join(p, "bookmarks.json");
+    } else {
+      INPUT_PATH = p;
+    }
+  } catch {
+    INPUT_PATH = p;
+  }
+}
+
 const LIMIT = parseInt(args["limit"] || "800", 10);
 const FETCH_ONLY = args["fetch-only"] === "true";
 
 if (!COOKIE && !INPUT_PATH) {
-  console.error("❌ 需要 --cookie 或 --input 参数");
+  console.error("❌ 需要 --cookie 或 --input/--reclassify 参数");
   process.exit(1);
 }
 if (!FETCH_ONLY && PROVIDER !== "ollama" && !API_KEY) {
@@ -453,6 +470,12 @@ async function main() {
   } else {
     console.log(`🌐 从 X 拉取书签（上限 ${LIMIT}）`);
     bookmarks = await fetchBookmarks(COOKIE, LIMIT);
+
+    // Always save a copy for later re-classification
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+    const outFile = path.join(OUTPUT_DIR, "bookmarks.json");
+    fs.writeFileSync(outFile, JSON.stringify(bookmarks, null, 2));
+    console.log(`💾 已保存书签 JSON：${outFile}`);
   }
 
   console.log(`\n✅ 共 ${bookmarks.length} 条书签\n`);

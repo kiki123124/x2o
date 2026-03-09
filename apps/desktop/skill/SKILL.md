@@ -44,6 +44,18 @@ npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
 # --provider ollama  --model llama3.2   （本地 Ollama 不需要 api-key）
 ```
 
+### Re-classify existing bookmarks (skip fetching):
+
+If you already have an output folder that contains `bookmarks.json`, you can re-run AI classification without fetching again:
+
+```bash
+npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
+  --input ~/x2o-output \
+  --provider openai \
+  --api-key "sk-..." \
+  --output ~/x2o-output
+```
+
 ### From existing JSON file (skip fetching):
 
 ```bash
@@ -59,7 +71,7 @@ npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
 | Flag | Required | Description |
 |------|----------|-------------|
 | `--cookie` | Yes* | X browser cookie (must contain `ct0`) |
-| `--input` | Yes* | Path to existing bookmarks JSON (alternative to cookie) |
+| `--input` | Yes* | Path to existing bookmarks JSON **or an output folder containing `bookmarks.json`** (alternative to cookie) |
 | `--provider` | No | AI provider (default: `openai`): `openai`, `claude`, `deepseek`, `gemini`, `ollama`, `groq`, `moonshot`, `qwen`, `zhipu`, `siliconflow`, `mistral`, `together`, `fireworks`, `xai`, `openrouter`, `cohere`, `deepinfra`, `perplexity` |
 | `--api-key` | Yes** | API key for the chosen provider (not required for `ollama`, or when using `--fetch-only`) |
 | `--output` | No | Output directory (default: `~/x2o-output`) |

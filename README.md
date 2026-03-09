@@ -90,6 +90,20 @@ pnpm tauri build
 
 ### 3️⃣ 开始导出 📚
 
+**重分类（已有书签，不重新抓取）：**
+
+如果你之前跑过一次，输出目录里会有 `bookmarks.json`。你可以直接对这个 JSON 重新做 AI 分类（换模型/换 provider 都行）：
+
+```bash
+npx tsx https://raw.githubusercontent.com/kiki123124/x2o/main/scripts/x2o.ts \
+  --input ~/x2o-output \
+  --provider openai \
+  --api-key "sk-..." \
+  --output ~/x2o-output
+```
+
+> 说明：`--input` 既可以传 `bookmarks.json` 文件路径，也可以直接传输出目录（会自动读取 `<dir>/bookmarks.json`）。
+
 **桌面 App：**
 1. 点击 **获取书签** → 预览抓取结果
 2. 确认后点击 **开始 AI 分类**
