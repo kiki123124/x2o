@@ -142,8 +142,8 @@ if (!COOKIE && !INPUT_PATH) {
   console.error("❌ 需要 --cookie 或 --input/--reclassify 参数");
   process.exit(1);
 }
-if (!FETCH_ONLY && PROVIDER !== "ollama" && !API_KEY) {
-  console.error("❌ 需要 --api-key 参数（ollama 除外）");
+if (!FETCH_ONLY && PROVIDER !== "ollama" && PROVIDER !== "host" && !API_KEY) {
+  console.error("❌ 需要 --api-key 参数（ollama / host 除外）");
   process.exit(1);
 }
 
@@ -588,11 +588,17 @@ async function main() {
   // Resolve t.co short URLs to real URLs
   await resolveTcoUrls(bookmarks);
 
-  if (FETCH_ONLY) {
+  if (FETCH_ONLY || PROVIDER === "host") {
     const outFile = path.join(OUTPUT_DIR, "bookmarks.json");
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
     fs.writeFileSync(outFile, JSON.stringify(bookmarks, null, 2));
     console.log(`💾 已保存到 ${outFile}`);
+    if (PROVIDER === "host") {
+      // Output summary for host AI to classify
+      console.log(`\n🤖 Host AI 分类模式：请宿主 AI 读取 ${outFile} 并进行分类`);
+      console.log(`📊 共 ${bookmarks.length} 条书签待分类`);
+      console.log(`📂 请将分类结果生成 Obsidian vault 到 ${OUTPUT_DIR}`);
+    }
     return;
   }
 

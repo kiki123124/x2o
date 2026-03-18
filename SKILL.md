@@ -16,22 +16,36 @@ description: |
   - "导出书签", "export bookmarks", "X 书签", "x2o", "书签分类"
   - "twitter bookmarks", "obsidian vault from bookmarks"
   - "classify my bookmarks", "organize bookmarks"
-version: 0.4.0
+version: 0.5.0
 ---
 
 # x2o — X Bookmark Export + AI Classification
 
 Export X (Twitter) bookmarks → AI classify → Obsidian knowledge vault. All local, no third-party servers.
 
-### What's New (v0.4.0)
+### What's New (v0.5.0)
+- **Host AI classification**: use `--provider host` — no API key needed, the host AI (Claude Code / OpenClaw) classifies bookmarks directly
 - Standalone reclassify: pick existing output folder, reclassify with different AI
-- Reads markdown content directly (no X link dependency)
 - t.co short URLs automatically resolved to real URLs
 - X Notes (long-form tweets) full content extraction
 
 ## Usage
 
-Run the CLI script via `npx tsx`:
+### Host AI Classification (no API key needed)
+
+The host AI (Claude Code, OpenClaw, etc.) can classify bookmarks directly — no external API key required:
+
+```bash
+npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
+  --cookie "<X cookie string>" \
+  --provider host \
+  --output ~/x2o-output \
+  --limit 100
+```
+
+This fetches bookmarks and saves `bookmarks.json`. The host AI then reads the bookmarks, classifies them, and generates the Obsidian vault.
+
+### External AI Provider (with API key)
 
 ```bash
 npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
@@ -41,48 +55,41 @@ npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
   --output ~/x2o-output \
   --limit 100
 
-# 也可以换成其他 provider：
+# Other providers:
 # --provider claude  --api-key "sk-ant-..."
+# --provider deepseek --api-key "sk-..."
 # --provider gemini  --api-key "..."
-# --provider ollama  --model llama3.2   （本地 Ollama 不需要 api-key）
+# --provider ollama  --model llama3.2   (local, no api-key needed)
 ```
 
 ### Re-classify existing bookmarks (skip fetching):
 
-If you already have an output folder that contains `bookmarks.json`, you can re-run AI classification without fetching again:
-
 ```bash
 npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
   --input ~/x2o-output \
-  --provider openai \
-  --api-key "sk-..." \
+  --provider host \
   --output ~/x2o-output
 ```
 
-### Rebuild from Markdown vault (only .md files) and re-classify:
+### Rebuild from Markdown vault and re-classify:
 
 ```bash
 npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
   --md-dir ~/x2o-output \
-  --provider openai \
-  --api-key "sk-..." \
+  --provider host \
   --output ~/x2o-output
 ```
-
-> Notes:
-> - Passing a directory to `--input/--reclassify/--md-dir` will first look for `<dir>/bookmarks.json`.
-> - If not found, it will try to parse X URLs from `.md` files and reconstruct a minimal bookmarks list.
 
 ## Parameters
 
 | Flag | Required | Description |
 |------|----------|-------------|
 | `--cookie` | Yes* | X browser cookie (must contain `ct0`) |
-| `--input` | Yes* | Path to existing bookmarks JSON **or an output folder containing `bookmarks.json`** (alternative to cookie) |
+| `--input` | Yes* | Path to existing bookmarks JSON or output folder (alternative to cookie) |
 | `--reclassify` | No | Alias of `--input` |
-| `--md-dir` | No | Path to a Markdown vault folder (only `.md` files). If the folder has `bookmarks.json`, it will use that first. |
-| `--provider` | No | AI provider (default: `openai`): `openai`, `claude`, `deepseek`, `gemini`, `ollama`, `groq`, `moonshot`, `qwen`, `zhipu`, `siliconflow`, `mistral`, `together`, `fireworks`, `xai`, `openrouter`, `cohere`, `deepinfra`, `perplexity` |
-| `--api-key` | Yes** | API key for the chosen provider (not required for `ollama`, or when using `--fetch-only`) |
+| `--md-dir` | No | Path to a Markdown vault folder |
+| `--provider` | No | AI provider: `host` (no API key), `openai`, `claude`, `deepseek`, `gemini`, `ollama`, `groq`, `moonshot`, `qwen`, `zhipu`, `siliconflow`, `mistral`, `together`, `fireworks`, `xai`, `openrouter`, `cohere`, `deepinfra`, `perplexity` |
+| `--api-key` | No** | API key for the chosen provider |
 | `--output` | No | Output directory (default: `~/x2o-output`) |
 | `--limit` | No | Max bookmarks to fetch (default: 800) |
 | `--model` | No | Override default model for the provider |
@@ -90,21 +97,23 @@ npx tsx ~/.claude/skills/x2o/scripts/x2o.ts \
 | `--fetch-only` | No | Only fetch bookmarks, skip classification |
 
 \* One of `--cookie` or `--input` is required
-\** Not required for `ollama` (local)
+\** Not required for `host` (uses host AI) or `ollama` (local)
 
 ## Workflow for Claude
 
 When user wants to export bookmarks:
 
 1. Ask for their X cookie (guide them: F12 → Network → find any request → copy Cookie header)
-2. Ask which AI provider they want to use + API key
-3. Run the script with appropriate parameters
-4. Report results: how many bookmarks fetched, categories found, files generated
-5. Optionally open the output in Obsidian: `open "obsidian://open?path=<output-dir>"`
+2. **Default to `--provider host`** — no API key needed, you classify the bookmarks yourself
+3. If user provides an API key, use the corresponding external provider instead
+4. Run the script with appropriate parameters
+5. **For host mode**: after the script saves `bookmarks.json`, read the file, classify each bookmark into categories (AI, Design, Crypto, Business, Career, Finance, Life, Tech, Media, News, etc.), and generate Obsidian vault markdown files
+6. Report results: how many bookmarks fetched, categories found, files generated
+7. Optionally open the output in Obsidian: `open "obsidian://open?path=<output-dir>"`
 
-## Supported AI Providers (18+)
+## Supported AI Providers (19+)
 
-OpenAI, Claude, DeepSeek, Gemini, Ollama, OpenRouter, Moonshot, Qwen, Zhipu GLM, SiliconFlow, Groq, Mistral, Together AI, Fireworks, Grok (xAI), Cohere, DeepInfra, Perplexity
+**Host AI** (no API key), OpenAI, Claude, DeepSeek, Gemini, Ollama, OpenRouter, Moonshot, Qwen, Zhipu GLM, SiliconFlow, Groq, Mistral, Together AI, Fireworks, Grok (xAI), Cohere, DeepInfra, Perplexity
 
 ## Source
 

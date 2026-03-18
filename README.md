@@ -1,4 +1,4 @@
-# 🏛️ x2o
+# x2o
 
 > X (Twitter) 书签 → Obsidian 知识库，一键搞定。
 
@@ -8,27 +8,21 @@
 
 ---
 
-## ✨ 功能亮点
+## 功能亮点
 
-- 📥 **一键抓取** — 粘贴浏览器 Cookie，自动拉取全部 X 书签
-- 🤖 **AI 智能分类** — 支持 18+ AI 服务商，自动归类 + 生成中文摘要
-- 📚 **Obsidian 知识库** — 按分类生成 Markdown 文件，直接用 Obsidian 打开
-- 🔄 **重新分类** — 选已有文件夹，换 AI 模型重新分类，不需要重新抓取
-- 🔗 **t.co 短链接解析** — 自动将 t.co 短链接还原为真实 URL
-- 📝 **长推文完整抓取** — 支持 X Notes 长文，不截断不丢内容
-- 🔒 **隐私优先** — 数据全部本地处理，不经过第三方服务器
-- ⚡ **Rust 高性能** — 核心 HTTP 请求和 JSON 解析在 Rust 侧完成，不卡不爆内存
-- 🖥️ **桌面 App + CLI** — 图形界面或命令行，随你选
+- **无需 API Key** — `--provider host` 让宿主 AI（Claude Code / OpenClaw）直接分类，零配置
+- **一键抓取** — 粘贴浏览器 Cookie，自动拉取全部 X 书签
+- **AI 智能分类** — 支持 19+ AI 服务商（含 host 模式），自动归类 + 生成中文摘要
+- **Obsidian 知识库** — 按分类生成 Markdown 文件，直接用 Obsidian 打开
+- **重新分类** — 选已有文件夹，换 AI 模型重新分类，不需要重新抓取
+- **t.co 短链接解析** — 自动将 t.co 短链接还原为真实 URL
+- **长推文完整抓取** — 支持 X Notes 长文，不截断不丢内容
+- **隐私优先** — 数据全部本地处理，不经过第三方服务器
+- **桌面 App + CLI** — 图形界面或命令行，随你选
 
 ---
 
-## 📦 安装
-
-### 桌面 App（macOS Apple Silicon）
-
-从 [Releases](../../releases) 下载最新的 `.dmg` 文件，拖入 Applications 即可。
-
-> ⚠️ 首次打开可能提示"无法验证开发者"，前往 **系统设置 → 隐私与安全性 → 仍要打开**
+## 安装
 
 ### CLI Skill（Claude Code / OpenClaw 用户）
 
@@ -43,20 +37,24 @@ npx skills add kiki123124/x2o
 **直接运行（不安装 skill）：**
 
 ```bash
+# Host AI 分类（无需 API key，宿主 AI 直接分类）
 npx tsx https://raw.githubusercontent.com/kiki123124/x2o/main/scripts/x2o.ts \
   --cookie "<你的 X Cookie>" \
-  --provider openai \
-  --api-key "sk-..." \
+  --provider host \
   --output ~/x2o-output
 
-# 其他示例：Claude / Gemini / Ollama
-# Claude
-# --provider claude --api-key "sk-ant-..."
-# Gemini
-# --provider gemini --api-key "..."
-# Ollama（本地，不需要 api-key）
-# --provider ollama --model llama3.2
+# 或使用外部 AI（需要 API key）
+# --provider deepseek --api-key "sk-..."
+# --provider openai   --api-key "sk-..."
+# --provider claude   --api-key "sk-ant-..."
+# --provider ollama   --model llama3.2  （本地，不需要 api-key）
 ```
+
+### 桌面 App（macOS Apple Silicon）
+
+从 [Releases](../../releases) 下载最新的 `.dmg` 文件，拖入 Applications 即可。
+
+> 首次打开可能提示"无法验证开发者"，前往 **系统设置 → 隐私与安全性 → 仍要打开**
 
 ### 从源码构建
 
@@ -69,108 +67,86 @@ pnpm tauri build
 
 ---
 
-## 🚀 使用方法
+## 使用方法
 
-### 1️⃣ 获取 Cookie 🍪
+### 1. 获取 Cookie
 
 1. 打开 [x.com](https://x.com) 并登录
 2. 按 `F12` 打开 DevTools → **Network** 标签
 3. 刷新页面，点击任意请求
 4. 找到 **Request Headers** 中的 `Cookie` 字段，完整复制
 
-### 2️⃣ 配置 AI 服务商 🤖
+### 2. 选择 AI 分类方式
 
-| 服务商 | 说明 |
-|--------|------|
-| 🟢 OpenAI | GPT-4o-mini，性价比高 |
-| 🔵 DeepSeek | 便宜好用，国内直连 |
-| 🟡 Claude | Anthropic，分类质量高 |
-| 🟣 Gemini | Google，免费额度大 |
-| ⚪ Ollama | 本地模型，完全免费 |
-| ... | 还支持 OpenRouter / Moonshot / Qwen / SiliconFlow / Groq 等 18+ 服务商 |
+| 方式 | 说明 | 需要 API Key |
+|------|------|:---:|
+| **Host AI** | 宿主 AI（Claude Code / OpenClaw）直接分类 | 否 |
+| Ollama | 本地模型，完全免费 | 否 |
+| DeepSeek | 便宜好用，国内直连 | 是 |
+| OpenAI | GPT-4o-mini，性价比高 | 是 |
+| Claude | Anthropic，分类质量高 | 是 |
+| Gemini | Google，免费额度大 | 是 |
+| ... | 还支持 OpenRouter / Moonshot / Qwen / SiliconFlow / Groq 等 19+ 服务商 | 是 |
 
-### 3️⃣ 开始导出 📚
+### 3. 开始导出
+
+**CLI（推荐 host 模式，无需 API key）：**
+```bash
+npx tsx x2o.ts --cookie "..." --provider host --output ~/vault
+```
 
 **重分类（已有书签，不重新抓取）：**
-
-如果你之前跑过一次，输出目录里会有 `bookmarks.json`。你可以直接对这个 JSON 重新做 AI 分类（换模型/换 provider 都行）：
-
 ```bash
-npx tsx https://raw.githubusercontent.com/kiki123124/x2o/main/scripts/x2o.ts \
-  --input ~/x2o-output \
-  --provider openai \
-  --api-key "sk-..." \
-  --output ~/x2o-output
+npx tsx x2o.ts --input ~/x2o-output --provider host --output ~/x2o-output
 ```
 
-**从已生成的 Markdown Vault 重建再分类（只有 md，没有 bookmarks.json 也行）：**
-
+**从 Markdown Vault 重建再分类：**
 ```bash
-npx tsx https://raw.githubusercontent.com/kiki123124/x2o/main/scripts/x2o.ts \
-  --md-dir ~/x2o-output \
-  --provider openai \
-  --api-key "sk-..." \
-  --output ~/x2o-output
+npx tsx x2o.ts --md-dir ~/x2o-output --provider host --output ~/x2o-output
 ```
-
-> 说明：`--input/--reclassify/--md-dir` 都支持传目录：优先读取 `<dir>/bookmarks.json`；如果不存在，会尝试从目录内的 `.md` 文件中解析出 X 链接并重建书签。
 
 **桌面 App：**
 1. 点击 **获取书签** → 预览抓取结果
 2. 确认后点击 **开始 AI 分类**
 3. 完成后点击 **Obsidian 打开** 或 **打开文件夹**
 
-**CLI：**
-```bash
-npx tsx x2o.ts --cookie "..." --provider deepseek --api-key "sk-..." --output ~/vault
-```
-
 ---
 
-## 🏗️ 技术栈
+## 技术栈
 
 | 层 | 技术 |
 |----|------|
-| 🖼️ 前端 | [SolidJS](https://solidjs.com) + [Tailwind CSS](https://tailwindcss.com) |
-| 🦀 后端 | [Tauri 2](https://tauri.app) + Rust |
-| 📡 HTTP | Rust `reqwest`（绕过 WebKit IPC 序列化瓶颈） |
-| 🎨 图标 | [@lobehub/icons](https://lobehub.com/icons) |
-| 🔧 CLI | TypeScript + Node.js |
-
-### 为什么用 Rust 做 HTTP？
-
-Tauri 的 HTTP 插件通过 IPC 把响应体传回 WebView 时，会将字节数组序列化为 JSON 数字数组。一个 1MB 的响应会膨胀到 5-10MB 的 JSON，导致 WebKit 进程内存飙到 9GB+。x2o 把所有 HTTP 请求和 JSON 解析放在 Rust 侧完成，只将精简后的结构化数据传给前端。
+| 前端 | [SolidJS](https://solidjs.com) + [Tailwind CSS](https://tailwindcss.com) |
+| 后端 | [Tauri 2](https://tauri.app) + Rust |
+| HTTP | Rust `reqwest`（绕过 WebKit IPC 序列化瓶颈） |
+| CLI | TypeScript + Node.js |
 
 ---
 
-## 🗂️ 项目结构
+## 项目结构
 
 ```
 apps/desktop/
 ├── src/                  # SolidJS 前端
-│   ├── App.tsx           # 主界面（侧边栏布局）
+│   ├── App.tsx           # 主界面
 │   ├── lib/sync.ts       # 同步管线（fetch → classify → generate）
 │   └── styles.css        # 主题样式
 ├── src-tauri/            # Rust 后端
-│   └── src/lib.rs        # HTTP 请求 / 书签解析 / 文件读写
-├── public/               # 静态资源（logo + AI 服务商图标）
-└── skill/                # Claude Code Skill
-    ├── SKILL.md
-    └── scripts/x2o.ts
+│   └── src/lib.rs        # HTTP 请求 / 书签解析
+scripts/
+└── x2o.ts                # CLI 脚本
+SKILL.md                  # Claude Code Skill 定义
 ```
 
 ---
 
-## 🤝 贡献
+## 贡献
 
 欢迎 PR 和 Issue！
 
-- 🐛 Bug 反馈 → [New Issue](../../issues/new)
-- 💡 功能建议 → [Discussions](../../discussions)
-
 ---
 
-## 📄 License
+## License
 
 [MIT](LICENSE)
 
