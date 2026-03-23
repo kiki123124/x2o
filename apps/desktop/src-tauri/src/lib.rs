@@ -3,7 +3,7 @@ use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use tauri::command;
 
