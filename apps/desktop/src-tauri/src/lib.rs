@@ -143,7 +143,7 @@ struct BookmarkLoadResult {
     truncated: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BookmarkMedia {
     #[serde(rename = "type")]
@@ -153,7 +153,7 @@ struct BookmarkMedia {
     alt_text: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BookmarkMetrics {
     likes: i64,
@@ -161,7 +161,7 @@ struct BookmarkMetrics {
     replies: i64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BookmarkItem {
     id: String,
