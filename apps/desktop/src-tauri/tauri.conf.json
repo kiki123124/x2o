@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicokosi/tauri/v2/crates/tauri-cli/schema.json",
   "productName": "x2o",
-  "version": "0.2.0",
+  "version": "0.5.0",
   "identifier": "com.x2o.desktop",
   "build": {
     "frontendDist": "../dist",

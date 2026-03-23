@@ -288,6 +288,19 @@ export async function fetchOnly(
     await debugLog("fetchOnly:empty_result");
     throw new Error("未获取到任何书签");
   }
+
+  // Resolve t.co short URLs for non-Rust paths (JSON/MD import)
+  if (config.inputPath) {
+    onProgress?.({ step: 1, detail: "正在解析 t.co 短链接...", percent: 95 });
+    try {
+      const { invoke } = await getTauriInvoke();
+      bookmarks = await invoke<Bookmark[]>("resolve_tco_urls_cmd", { bookmarks });
+      await debugLog(`fetchOnly:tco_resolved count=${bookmarks.length}`);
+    } catch (e) {
+      await debugLog(`fetchOnly:tco_resolve_failed ${e}`);
+    }
+  }
+
   await debugLog(`fetchOnly:done count=${bookmarks.length}`);
 
   return bookmarks;

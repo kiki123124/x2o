@@ -1,14 +1,18 @@
 # x2o
 
+> X (Twitter) Bookmarks → Obsidian Knowledge Vault, one click.
+>
 > X (Twitter) 书签 → Obsidian 知识库，一键搞定。
 
 ![macOS](https://img.shields.io/badge/macOS-10.15+-black?logo=apple)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8D8?logo=tauri)
 
+Export your X (Twitter) bookmarks, classify them with 19+ AI providers (including local models via Ollama and API-free host mode for AI agents like Claude Code), and generate a structured Obsidian knowledge vault — all locally, no third-party servers.
+
 ---
 
-## 功能亮点
+## Features / 功能亮点
 
 - **无需 API Key** — `--provider host` 让宿主 AI（Claude Code / OpenClaw）直接分类，零配置
 - **一键抓取** — 粘贴浏览器 Cookie，自动拉取全部 X 书签

@@ -394,6 +394,14 @@ fn parse_bookmark_entries(json: &Value) -> (Vec<BookmarkItem>, Option<String>) {
     (out, next_cursor)
 }
 
+/// Resolve t.co short URLs to real URLs (exposed as Tauri command for import path).
+#[command]
+async fn resolve_tco_urls_cmd(bookmarks: Vec<BookmarkItem>) -> Result<Vec<BookmarkItem>, String> {
+    let mut bm = bookmarks;
+    resolve_tco_urls(&mut bm).await;
+    Ok(bm)
+}
+
 /// Resolve t.co short URLs to real URLs by following redirects.
 async fn resolve_tco_urls(bookmarks: &mut Vec<BookmarkItem>) {
     use regex::Regex;
@@ -550,7 +558,8 @@ pub fn run() {
             open_target,
             open_in_obsidian,
             load_bookmarks_json,
-            fetch_bookmarks_rust
+            fetch_bookmarks_rust,
+            resolve_tco_urls_cmd
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
